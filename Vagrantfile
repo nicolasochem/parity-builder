@@ -10,11 +10,20 @@ add-apt-repository \
    stable"
 apt-get update
 apt-get -y install docker-ce
+docker build -t parity-builder - < Dockerfile
+docker run --rm --entrypoint cat parity-builder /build/parity/target/release/parity > /vagrant/parity
 SCRIPT
 
 Vagrant.configure("2") do |config|
 
   config.vm.box = "ubuntu/xenial64"
+
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 4096
+    v.cpus = 2
+  end
+
+  config.vm.provision "file", source: "Dockerfile", destination: "Dockerfile"
 
   config.vm.provision "shell", inline: $script
 
