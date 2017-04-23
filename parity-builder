@@ -16,14 +16,38 @@ case $i in
     PARITY_VERSION="${i#*=}"
     shift
     ;;
+    -b=*|--amazon-s3-bucket=*)
+    S3_BUCKET="${i#*=}"
+    shift
+    ;;
+    -k=*|--amazon-s3-key=*)
+    S3_KEY="${i#*=}"
+    shift
+    ;;
+    -s=*|--amazon-s3-secret=*)
+    S3_SECRET="${i#*=}"
+    shift
+    ;;
+    -z=*|--amazon-s3-zone=*)
+    S3_ZONE="${i#*=}"
+    shift
+    ;;
     -h*|--help*)
     printf "Usage: $0 [--help] [--rust-version={stable,beta,nightly} ]\n"
     printf "               [--parity-version={stable,beta,master} ]\n"
+    printf "               [--amazon-s3-bucket=mybucket ]\n"
+    printf "               [--amazon-s3-key=mykey ]\n"
+    printf "               [--amazon-s3-secret=mysecret ]\n"
+    printf "               [--amazon-s3-zone=myzone ]\n"
     printf "\n"
     printf "optional arguments:\n"
-    printf " -h, --help            show this help message and exit\n"
-    printf " -r, --rust-version    select rust version from stable, beta or nightly\n"
-    printf " -p, --parity-version  select parity version from stable, beta or master\n"
+    printf " -h, --help                    show this help message and exit\n"
+    printf " -r, --rust-version            select rust version from stable, beta or nightly\n"
+    printf " -p, --parity-version          select parity version from stable, beta or master\n"
+    printf " -b, --amazon-s3-bucket        Amazon S3 bucket to upload the binary to\n"
+    printf " -k, --amazon-s3-key           Amazon S3 programmatic access key for upload\n"
+    printf " -s, --amazon-s3-secret        Amazon S3 secret token for upload\n"
+    printf " -z, --amazon-s3-zone          Amazon S3 zone for upload\n"
     exit 0
     ;;
     *)
@@ -43,10 +67,49 @@ RUST_VERSION=$RUST_VERSION PARITY_VERSION=$PARITY_VERSION vagrant up --provider=
 
 if ! ls parity
 then
-    printf "ERROR: no parity file found.\n"
+    printf "ERROR: no parity binary file found.\n"
     exit 3
 fi
 
-vagrant destroy
+vagrant destroy -f
+
+if [[ "$S3_BUCKET" == "" ]]
+then
+    printf "Done.\n"
+    exit 0
+fi
+
+if [[ "$S3_SECRET" == "" || "$S3_KEY" == "" || "$S3_ZONE" == "" ]]
+then
+    printf "You need to provide Amazon S3 signature, key and zone in order to upload.\n"
+    printf "Use -h or --help to list possible options.\n"
+    exit 4
+fi
+
+# timestamping build artifact
+file="parity-$(date +'%Y%m%d%H%M%S')"
+
+mv parity $file
+
+resource="/$S3_BUCKET/${file}"
+content_type="application/x-binary"
+acl="x-amz-acl:public-read"
+date_value="$(date -R)"
+string_to_sign="PUT\n\n${content_type}\n${date_value}\n${acl}\n${resource}"
+signature=$(echo -en ${string_to_sign} | openssl sha1 -hmac $S3_SECRET -binary | base64)
+
+if curl -X PUT -T "${file}" \
+  -H "Host: $S3_BUCKET.s3-$S3_ZONE.amazonaws.com" \
+  -H "Date: $date_value" \
+  -H "${acl}" \
+  -H "Content-Type: $content_type" \
+  -H "Authorization: AWS $S3_KEY:$signature" \
+  https://$S3_BUCKET.s3-$S3_ZONE.amazonaws.com/${file}
+then
+    printf "Upload successful. Download Parity build at https://s3-$S3_ZONE.amazonaws.com/$S3_BUCKET/${file}\n"
+else
+    printf "Error uploading file to AWS."
+    exit 5
+fi
 
 printf "Done.\n"
