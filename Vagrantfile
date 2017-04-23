@@ -1,8 +1,24 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 #
-$script = <<SCRIPT
-# This script installs the latest stable version of docker.
+
+if ENV['RUST_VERSION']
+    RUST_VERSION = ENV['RUST_VERSION']
+else
+    RUST_VERSION = "stable"
+end
+
+if ENV['PARITY_VERSION']
+    PARITY_VERSION = ENV['PARITY_VERSION']
+else
+    PARITY_VERSION = "stable"
+end
+
+$script = <<SCRIPT.gsub("$RUST_VERSION", RUST_VERSION).gsub("$PARITY_VERSION", PARITY_VERSION)
+
+echo "Building parity version $PARITY_VERSION with Rust version $RUST_VERSION."
+
+# Install dependencies
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
 add-apt-repository \
    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
@@ -10,7 +26,11 @@ add-apt-repository \
    stable"
 apt-get update
 apt-get -y install docker-ce
-docker build -t parity-builder - < Dockerfile
+
+# Build in a container
+docker build -t parity-builder --build-arg RUST_VERSION=$RUST_VERSION --build-arg PARITY_VERSION=$PARITY_VERSION  .
+
+#Copy back parity binary to Vagrant host
 docker run --rm --entrypoint cat parity-builder /build/parity/target/release/parity > /vagrant/parity
 SCRIPT
 

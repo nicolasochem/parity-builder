@@ -1,5 +1,23 @@
-Docker-vm-creator
-=================
+Parity builder
+==============
 
-Run `vagrant up` to automatically spin up an Ubuntu 16.04 VM
-with the latest version of Docker engine installed.
+This is a toy script to build [parity](https://github.com/paritylabs/parity)
+in a predictable environment.
+
+It spins up an Ubuntu 16.04 vagrant box, which in turn spins up a Docker
+container that builds parity.
+
+Do not use in production.
+
+Prerequisites
+-------------
+
+You need vagrant and virtualbox. This has been tested on Fedora 25 with
+Virtualbox.
+
+Usage
+-----
+
+Run `parity-builder`.
+
+See `parity-builder --help` for a list of options.

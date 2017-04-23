@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -e
+
+RUST_VERSION="stable"
+PARITY_VERSION="stable"
+
+for i in "$@"
+do
+case $i in
+    -r=*|--rust-version=*)
+    RUST_VERSION="${i#*=}"
+    shift
+    ;;
+    -p=*|--parity-version=*)
+    PARITY_VERSION="${i#*=}"
+    shift
+    ;;
+    -h*|--help*)
+    printf "Usage: $0 [--help] [--rust-version={stable,beta,nightly} ]\n"
+    printf "               [--parity-version={stable,beta,master} ]\n"
+    printf "\n"
+    printf "optional arguments:\n"
+    printf " -h, --help            show this help message and exit\n"
+    printf " -r, --rust-version    select rust version from stable, beta or nightly\n"
+    printf " -p, --parity-version  select parity version from stable, beta or master\n"
+    exit 0
+    ;;
+    *)
+    printf "Unknown option. Use -h or --help to list possible options.\n"
+    exit 1
+    ;;
+esac
+done
+
+if ! vagrant status --machine-readable | grep not_created
+then
+    printf "Vagrant vm is already created. Destroy it first with 'vagrant destroy'\n"
+    exit 2
+fi
+
+RUST_VERSION=$RUST_VERSION PARITY_VERSION=$PARITY_VERSION vagrant up --provider=virtualbox
+
+if ! ls parity
+then
+    printf "ERROR: no parity file found.\n"
+    exit 3
+fi
+
+vagrant destroy
+
+printf "Done.\n"
